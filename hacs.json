@@ -1,8 +1,8 @@
 {
-  "name": "FoxESS - Modbus (EVO)",
+  "name": "FoxESS - Modbus (EVO)- Extended",
   "hacs": "1.20.0",
   "homeassistant": "2025.1.0",
   "render_readme": true,
   "zip_release": true,
-  "filename": "foxess_modbus_evo.zip"
+  "filename": "foxess_modbus_evo_extended.zip"
 }
