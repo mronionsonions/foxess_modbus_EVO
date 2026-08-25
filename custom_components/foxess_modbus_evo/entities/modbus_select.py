@@ -30,7 +30,7 @@ class ModbusSelectDescription(SelectEntityDescription, EntityFactory):  # type: 
     address: list[ModbusAddressSpec]
     options_map: dict[int, str]
     # Additional Write map for EVO
-    write_options_map: dict[int, str] | None = None 
+    write_options_map: dict[int, str] | None = None
     validate: list[BaseValidator] = field(default_factory=list)
 
     @property
@@ -75,7 +75,15 @@ class ModbusSelect(ModbusEntityMixin, SelectEntity):
         self.entity_description = entity_description
         self._address = address
         self.entity_id = self._get_entity_id(Platform.SELECT)
-        self._attr_options = list(self.entity_description.options_map.values())
+        # Deduplicate option labels (some inverters return different numeric values
+        # for the same label on read vs write, e.g. EVO10 uses 1 for "Self Use" when
+        # reading but accepts 0 when writing). Keep order deterministic.
+        seen: set[str] = set()
+        self._attr_options = []
+        for v in self.entity_description.options_map.values():
+            if v not in seen:
+                seen.add(v)
+                self._attr_options.append(v)
 
     @property
     def current_option(self) -> str | None:
@@ -98,10 +106,11 @@ class ModbusSelect(ModbusEntityMixin, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         entity_description = cast(ModbusSelectDescription, self.entity_description)
-        write_map = entity_description.write_options_map or entity_description.options_map  
-value = next(  
-    (k for k, v in write_map.items() if v == option),
-        )
+        write_map = entity_description.write_options_map or entity_description.options_map
+        # Lookup the numeric value to write for the requested option label. If a
+        # write_options_map is provided, prefer it; otherwise fall back to the
+        # read options_map. Use a safe next(..., None) pattern.
+        value = next((k for k, v in write_map.items() if v == option), None)
         if value is None:
             _LOGGER.warning(
                 "Failed to write unknown value '%s' to register '%s' with address %s. Valid values: %s",
